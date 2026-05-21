@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIによる適時開示監視・X投稿支援システム — 実装提案補足</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --blue-50: #f0f6ff;
+    --blue-100: #dbeafe;
+    --blue-200: #bfdbfe;
+    --blue-400: #60a5fa;
+    --blue-500: #3b82f6;
+    --blue-600: #2563eb;
+    --blue-700: #1d4ed8;
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-400: #94a3b8;
+    --slate-500: #64748b;
+    --slate-600: #475569;
+    --slate-700: #334155;
+    --slate-800: #1e293b;
+    --slate-900: #0f172a;
+    --green-100: #dcfce7;
+    --green-700: #15803d;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.05);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: #fff;
+    color: var(--slate-800);
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 660px;
+    margin: 0 auto;
+    padding: 52px 24px 88px;
+  }
+
+  /* ── Header ── */
+  .header {
+    margin-bottom: 52px;
+    opacity: 0;
+    transform: translateY(14px);
+    animation: fadeUp 0.5s ease forwards;
+  }
+
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+
+  .doc-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+    color: var(--slate-400);
+    text-transform: uppercase;
+  }
+
+  .dot { color: var(--slate-300); }
+
+  .date-label {
+    font-size: 11px;
+    color: var(--slate-400);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .header h1 {
+    font-size: clamp(19px, 4.8vw, 24px);
+    font-weight: 600;
+    color: var(--slate-900);
+    line-height: 1.45;
+    letter-spacing: -0.015em;
+    margin-bottom: 16px;
+  }
+
+  .header-desc {
+    font-size: 14px;
+    color: var(--slate-600);
+    line-height: 1.85;
+    padding: 15px 18px;
+    background: var(--blue-50);
+    border-left: 2px solid var(--blue-400);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+
+  /* ── Section ── */
+  .section {
+    margin-bottom: 28px;
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  .section.visible {
+    animation: fadeUp 0.42s ease forwards;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--slate-400);
+    margin-bottom: 10px;
+  }
+
+  /* ── Generic card ── */
+  .card {
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: var(--radius);
+    padding: 26px;
+    box-shadow: var(--shadow);
+  }
+
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--slate-700);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title-icon {
+    width: 26px; height: 26px;
+    background: var(--blue-50);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+
+  /* ── Concept block ── */
+  .concept-text {
+    font-size: 14px;
+    color: var(--slate-600);
+    line-height: 1.85;
+  }
+
+  .concept-text + .concept-text { margin-top: 10px; }
+
+  .flow-steps {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--slate-100);
+  }
+
+  .flow-step:last-child { border-bottom: none; }
+
+  .step-num {
+    flex-shrink: 0;
+    width: 22px; height: 22px;
+    background: var(--blue-50);
+    border: 1px solid var(--blue-200);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--blue-600);
+    font-family: 'DM Mono', monospace;
+    margin-top: 1px;
+  }
+
+  .step-body {
+    flex: 1;
+  }
+
+  .step-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--slate-700);
+    line-height: 1.4;
+  }
+
+  .step-desc {
+    font-size: 12px;
+    color: var(--slate-500);
+    margin-top: 2px;
+    line-height: 1.55;
+  }
+
+  /* ── Checklist ── */
+  .checklist {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--slate-700);
+    line-height: 1.55;
+  }
+
+  .check-icon {
+    flex-shrink: 0;
+    width: 17px; height: 17px;
+    background: var(--green-100);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+
+  .check-icon svg { display: block; }
+
+  .phase2-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 13px 16px;
+    background: var(--blue-50);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--blue-100);
+    margin-top: 16px;
+  }
+
+  .tag-phase2 {
+    display: inline-flex;
+    align-items: center;
+    background: var(--blue-100);
+    color: var(--blue-700);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 100px;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    margin-top: 1px;
+  }
+
+  .phase2-desc {
+    font-size: 12px;
+    color: var(--slate-600);
+    line-height: 1.6;
+  }
+
+  /* ── Tech grid ── */
+  .tech-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .tech-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 13px;
+    background: var(--slate-50);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--slate-100);
+    font-size: 13px;
+    color: var(--slate-700);
+  }
+
+  .tech-dot {
+    width: 6px; height: 6px;
+    background: var(--blue-400);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── Notes ── */
+  .notes-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .notes-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--slate-600);
+    line-height: 1.65;
+    padding: 9px 13px;
+    background: var(--slate-50);
+    border-radius: var(--radius-sm);
+  }
+
+  .notes-list li::before {
+    content: '·';
+    color: var(--slate-400);
+    font-size: 18px;
+    line-height: 1.25;
+    flex-shrink: 0;
+  }
+
+  /* ── Price card (soft) ── */
+  .price-card {
+    background: var(--blue-50);
+    border: 1px solid var(--blue-100);
+    border-radius: var(--radius);
+    padding: 26px;
+    box-shadow: var(--shadow);
+  }
+
+  .price-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .price-left { flex: 1; min-width: 180px; }
+
+  .badge-mvp {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #fff;
+    border: 1px solid var(--blue-200);
+    color: var(--blue-700);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 3px 11px;
+    border-radius: 100px;
+    margin-bottom: 10px;
+  }
+
+  .badge-mvp::before {
+    content: '';
+    width: 5px; height: 5px;
+    background: var(--blue-400);
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .price-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--slate-800);
+  }
+
+  .price-right {
+    text-align: right;
+  }
+
+  .price-amount {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--slate-900);
+    letter-spacing: -0.02em;
+    font-family: 'DM Mono', monospace;
+    line-height: 1.1;
+  }
+
+  .price-tax {
+    font-size: 11px;
+    color: var(--slate-500);
+    margin-top: 3px;
+  }
+
+  .price-divider {
+    border: none;
+    border-top: 1px solid var(--blue-200);
+    margin: 0 0 16px;
+  }
+
+  .price-meta {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .price-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .meta-label {
+    font-size: 11px;
+    color: var(--slate-500);
+  }
+
+  .meta-value {
+    font-size: 13px;
+    color: var(--slate-700);
+    font-weight: 500;
+  }
+
+  /* ── Footer ── */
+  .footer-msg {
+    margin-top: 52px;
+    padding-top: 32px;
+    border-top: 1px solid var(--slate-100);
+    text-align: center;
+  }
+
+  .footer-quote {
+    font-size: 14px;
+    color: var(--slate-600);
+    line-height: 1.9;
+    font-weight: 400;
+  }
+
+  .footer-quote em {
+    font-style: normal;
+    color: var(--blue-600);
+    font-weight: 500;
+  }
+
+  .footer-note {
+    margin-top: 18px;
+    font-size: 11px;
+    color: var(--slate-400);
+  }
+
+  /* ── Animation ── */
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 480px) {
+    .page { padding: 32px 16px 64px; }
+    .card, .price-card { padding: 20px; }
+    .tech-grid { grid-template-columns: 1fr; }
+    .price-top { flex-direction: column; align-items: flex-start; }
+    .price-right { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-meta">
+      <span class="doc-label">実装提案補足</span>
+      <span class="dot">·</span>
+      <span class="date-label" id="docDate"></span>
+    </div>
+    <h1>AIによる適時開示監視・<br>X投稿支援システム</h1>
+    <p class="header-desc">
+      まずは「実際に回る最小構成（MVP）」を構築し、<br>
+      運用しながら必要な機能を少しずつ追加していく形を想定しています。
+    </p>
+  </header>
+
+  <!-- 1. What we build -->
+  <section class="section" data-delay="0">
+    <p class="section-label">何を作るか</p>
+    <div class="card">
+      <p class="card-title">
+        <span class="card-title-icon">🗺️</span>
+        今回のシステム概要
+      </p>
+      <p class="concept-text">
+        適時開示（TDnet）の情報を自動で取得し、AIが要約・X投稿案を生成。<br>
+        確認・承認のフローをSlackまたはLINEに通知し、Googleスプレッドシートでログ管理する仕組みを構築します。
+      </p>
+      <div class="flow-steps">
+        <div class="flow-step">
+          <span class="step-num">1</span>
+          <div class="step-body">
+            <div class="step-title">適時開示情報を自動取得</div>
+            <div class="step-desc">TDnetから定期的に情報を収集</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <span class="step-num">2</span>
+          <div class="step-body">
+            <div class="step-title">AIで要約・X投稿案を生成</div>
+            <div class="step-desc">OpenAI / Gemini APIを使って自動生成</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <span class="step-num">3</span>
+          <div class="step-body">
+            <div class="step-title">通知 &amp; 確認</div>
+            <div class="step-desc">SlackまたはLINEに通知、担当者が確認</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <span class="step-num">4</span>
+          <div class="step-body">
+            <div class="step-title">スプレッドシートでログ管理</div>
+            <div class="step-desc">履歴をGoogleスプレッドシートに自動保存</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Scope -->
+  <section class="section" data-delay="60">
+    <p class="section-label">対応範囲</p>
+    <div class="card">
+      <p class="card-title">
+        <span class="card-title-icon">📋</span>
+        MVP構築に含まれる機能
+      </p>
+      <ul class="checklist">
+        <li>
+          <span class="check-icon">
+            <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#16a34a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          適時開示情報の自動取得
+        </li>
+        <li>
+          <span class="check-icon">
+            <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#16a34a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          AI による開示内容の要約生成
+        </li>
+        <li>
+          <span class="check-icon">
+            <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#16a34a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          X（旧Twitter）投稿案の自動生成
+        </li>
+        <li>
+          <span class="check-icon">
+            <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#16a34a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          LINE または Slack への通知連携
+        </li>
+        <li>
+          <span class="check-icon">
+            <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#16a34a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          Google スプレッドシート連携・ログ管理
+        </li>
+        <li>
+          <span class="check-icon">
+            <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#16a34a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          初期設定・動作確認・納品サポート
+        </li>
+      </ul>
+      <div class="phase2-wrap">
+        <span class="tag-phase2">＋ Phase 2</span>
+        <span class="phase2-desc">自動投稿・市場分析・高度なフィルタリングなど、運用後に段階的に拡張できます。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Tech -->
+  <section class="section" data-delay="120">
+    <p class="section-label">技術構成</p>
+    <div class="card">
+      <p class="card-title">
+        <span class="card-title-icon">⚙️</span>
+        想定スタック
+      </p>
+      <div class="tech-grid">
+        <div class="tech-item"><span class="tech-dot"></span>Google Apps Script</div>
+        <div class="tech-item"><span class="tech-dot"></span>Google スプレッドシート</div>
+        <div class="tech-item"><span class="tech-dot"></span>OpenAI / Gemini API</div>
+        <div class="tech-item"><span class="tech-dot"></span>Slack / LINE 通知</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Notes -->
+  <section class="section" data-delay="180">
+    <p class="section-label">前提・確認事項</p>
+    <div class="card">
+      <ul class="notes-list">
+        <li>まず MVP を動かし、運用しながら機能を追加していく形を推奨しています。</li>
+        <li>Phase 2（自動投稿・市場分析等）は別途相談ベースで進められます。</li>
+        <li>OpenAI / Gemini 等の API 利用料は別途実費となります。</li>
+        <li>X API 仕様変更等により、一部調整が必要となる場合があります。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 5. Price (last) -->
+  <section class="section" data-delay="240">
+    <p class="section-label">MVP 構築費</p>
+    <div class="price-card">
+      <div class="price-top">
+        <div class="price-left">
+          <span class="badge-mvp">MVP構築</span>
+          <p class="price-name">今回の初期開発範囲</p>
+        </div>
+        <div class="price-right">
+          <div class="price-amount">¥80,000</div>
+          <div class="price-tax">税込</div>
+        </div>
+      </div>
+      <hr class="price-divider">
+      <div class="price-meta">
+        <div class="price-meta-item">
+          <span class="meta-label">納期目安</span>
+          <span class="meta-value">約 2〜3 週間</span>
+        </div>
+        <div class="price-meta-item">
+          <span class="meta-label">フェーズ</span>
+          <span class="meta-value">MVP / Phase 1</span>
+        </div>
+        <div class="price-meta-item">
+          <span class="meta-label">その後</span>
+          <span class="meta-value">Phase 2 拡張可</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer-msg">
+    <p class="footer-quote">
+      まずは<em>小さく始め</em>、実運用を通して<br>精度と運用性を高めていく形を推奨しています。<br>
+      進め方や範囲はご相談しながら決めていきましょう。
+    </p>
+    <p class="footer-note">本資料の有効期限は発行日より30日間です。</p>
+  </footer>
+
+</div>
+<script>
+  const d = new Date();
+  document.getElementById('docDate').textContent =
+    `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const delay = entry.target.dataset.delay || 0;
+        setTimeout(() => entry.target.classList.add('visible'), Number(delay));
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -32px 0px' });
+
+  document.querySelectorAll('.section').forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
